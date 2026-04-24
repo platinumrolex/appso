@@ -1,6 +1,6 @@
 use crate::ui::header::{EngineHeader, ScaledMetrics};
 use wgpu_ui::HoverEffect;
-use wgpu_ui::HitRegion;
+
 // top level ui zone
 #[derive(PartialEq, Eq, Debug, Clone, Copy, Default)]
 pub enum UiZone {
@@ -60,11 +60,11 @@ use crate::ui::header::HeaderAction;
 
 impl<A: UiAction> InteractionState<A> {
     /// 1. Updates the high-level zone and returns true if it changed
-    pub fn update_zone(&mut self, mouse_pos: (f32, f32),screen_width: f32,metrics: &ScaledMetrics,header: &mut EngineHeader) {
+    pub fn update_zone(&mut self, mouse_pos: (f32, f32), screen_width: f32, metrics: &ScaledMetrics, header: &mut EngineHeader) {
         self.zone = match header.zone_at(mouse_pos, screen_width, metrics) {
             Some(zone) => UiZone::Runtime(zone),
             None => UiZone::App,
-        }
+        };
     }
 
   pub fn check_hovered(&mut self, next_action: A, hover_data: Option<HoverEffect>) -> bool {

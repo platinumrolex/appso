@@ -1,7 +1,20 @@
 use wgpu_text::glyph_brush::{HorizontalAlign, VerticalAlign};
 
+// ---------------------------------------------------------------------------
+// New: carries action, hover visual, and hit-test bounds in one place
+// ---------------------------------------------------------------------------
 #[derive(Clone, Debug)]
-pub enum Primitive {
+pub struct Interaction<A> {
+    pub action: A,
+    pub hover_effect: HoverEffect,
+    pub bounds: Rect,
+}
+
+// ---------------------------------------------------------------------------
+// Primitives now know about their interaction
+// ---------------------------------------------------------------------------
+#[derive(Clone, Debug)]
+pub enum Primitive<A> {
     Rect {
         x: f32,
         y: f32,
@@ -9,6 +22,7 @@ pub enum Primitive {
         h: f32,
         color: [f32; 4],
         corner_radius: f32,
+        interaction: Option<Interaction<A>>,
     },
     Text {
         content: String,
@@ -18,16 +32,15 @@ pub enum Primitive {
         size: f32,
         h_align: HorizontalAlign,
         v_align: VerticalAlign,
+        interaction: Option<Interaction<A>>,
     },
 }
 
-#[derive(Clone, Debug)]
-pub struct HitRegion<A> {
-    pub bounds: Rect,
-    pub action: A,
-    pub hover: HoverEffect,
-}
+// ---------------------------------------------------------------------------
+// HitRegion removed – its information is now inside Interaction
+// ---------------------------------------------------------------------------
 
+// Rect, HoverEffect, UiAction – unchanged from your original
 #[derive(Clone, Copy, Debug)]
 pub struct Rect {
     pub x: f32,
@@ -62,25 +75,18 @@ pub enum HoverEffect {
 
 impl HoverEffect {
     pub fn resolve_bg(&self, is_hovered: bool, is_pressed: bool) -> Option<[f32; 4]> {
+        // … identical to your current implementation …
         match self {
             HoverEffect::None => None,
             HoverEffect::Button { bg_idle, bg_hover, bg_pressed, .. } => {
-                Some(if is_hovered && is_pressed {
-                    *bg_pressed
-                } else if is_hovered {
-                    *bg_hover
-                } else {
-                    *bg_idle
-                })
+                Some(if is_hovered && is_pressed { *bg_pressed }
+                     else if is_hovered { *bg_hover }
+                     else { *bg_idle })
             }
             HoverEffect::Highlight { bg_hover, bg_pressed } => {
-                if is_hovered && is_pressed {
-                    Some(*bg_pressed)
-                } else if is_hovered {
-                    Some(*bg_hover)
-                } else {
-                    None
-                }
+                if is_hovered && is_pressed { Some(*bg_pressed) }
+                else if is_hovered { Some(*bg_hover) }
+                else { None }
             }
         }
     }
@@ -102,9 +108,6 @@ impl HoverEffect {
     }
 }
 
-// In a common location, e.g., crates/wgpu-ui/src/primitives.rs or a new file
 pub trait UiAction: PartialEq + Copy + std::fmt::Debug {
-    /// Returns true if this action represents an interactive element (like a button)
-    /// and should trigger hover effects/redraws.
     fn is_interactive(&self) -> bool;
 }

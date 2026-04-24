@@ -30,4 +30,4 @@ pub use ui_zone::{determine_active_zone,  UiZone, RuntimeZone};
 pub use window::{create_window, apply_platform_style};
 
 // Re-export wgpu_ui for convenience
-pub use wgpu_ui::{ButtonStyle, Primitive, HitRegion, HoverEffect, ui};
+pub use wgpu_ui::{ButtonStyle, Primitive, HoverEffect, ui};

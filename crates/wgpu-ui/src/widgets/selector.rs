@@ -1,5 +1,5 @@
 use wgpu_text::glyph_brush::{HorizontalAlign, VerticalAlign};
-use crate::{widget, primitives::{HitRegion, HoverEffect, Primitive}, style::ButtonStyle};
+use crate::{widget, primitives::{Interaction, Primitive, HoverEffect}, style::ButtonStyle};
 
 #[derive(Clone)]
 pub struct SelectorOption<A> {
@@ -17,7 +17,7 @@ widget! {
         style: ButtonStyle = ButtonStyle::primary(),
         options: Vec<SelectorOption<A>> = Vec::new(),
     }
-    render: |this, prims, hits| {
+    render: |this, prims| {
         let x = this.bounds.x;
         let y = this.bounds.y;
         let w = this.bounds.w;
@@ -29,16 +29,16 @@ widget! {
         let box_h = h - 8.0;
         let box_y = y + 4.0;
 
-        // Main panel background
+        // Main panel background (non-interactive)
         prims.push(Primitive::Rect {
             x, y,
             w: 120.0 + box_w,
             h,
             color: [0.12, 0.12, 0.12, 0.98],
             corner_radius: 0.0,
+            interaction: None,
         });
 
-        // Label text
         prims.push(Primitive::Text {
             content: this.label.clone(),
             x: label_x,
@@ -47,17 +47,23 @@ widget! {
             size: 14.0,
             h_align: HorizontalAlign::Left,
             v_align: VerticalAlign::Center,
+            interaction: None,
         });
 
-        // Selector box background
+        // Selector box – interactive
+        let box_interaction = Interaction {
+            action: this.toggle_action,
+            hover_effect: this.style.to_hover_effect(),
+            bounds: crate::Rect { x: box_x, y: box_y, w: box_w, h: box_h },
+        };
+
         let box_bg_color = if this.expanded { this.style.bg_pressed } else { this.style.bg_idle };
         prims.push(Primitive::Rect {
             x: box_x, y: box_y, w: box_w, h: box_h,
             color: box_bg_color,
             corner_radius: this.style.border_radius,
+            interaction: Some(box_interaction.clone()),
         });
-
-        // Current value text
         prims.push(Primitive::Text {
             content: this.current.clone(),
             x: box_x + 12.0,
@@ -66,9 +72,8 @@ widget! {
             size: this.style.text_size,
             h_align: HorizontalAlign::Left,
             v_align: VerticalAlign::Center,
+            interaction: Some(box_interaction.clone()),
         });
-
-        // Dropdown arrow
         prims.push(Primitive::Text {
             content: "⌵".to_string(),
             x: box_x + box_w - 20.0,
@@ -77,20 +82,7 @@ widget! {
             size: this.style.text_size,
             h_align: HorizontalAlign::Center,
             v_align: VerticalAlign::Center,
-        });
-
-        // Hit region for selector box
-        hits.push(HitRegion {
-            bounds: crate::Rect { x: box_x, y: box_y, w: box_w, h: box_h },
-            action: this.toggle_action,
-            hover: HoverEffect::Button {
-                bg_idle: this.style.bg_idle,
-                bg_hover: this.style.bg_hover,
-                bg_pressed: this.style.bg_pressed,
-                text_idle: this.style.text_idle,
-                text_hover: this.style.text_hover,
-                corner_radius: this.style.border_radius,
-            },
+            interaction: Some(box_interaction),
         });
 
         // Options (if expanded)
@@ -100,33 +92,41 @@ widget! {
                 x: box_x, y: box_y, w: box_w, h: opt_count * h,
                 color: [0.18, 0.18, 0.18, 1.0],
                 corner_radius: 0.0,
+                interaction: None,
             });
 
             let mut opt_y = box_y;
             for opt in &this.options {
                 let is_selected = opt.selected;
-                let bg_color = if is_selected {
-                    [0.25, 0.25, 0.25, 1.0]
-                } else {
-                    [0.18, 0.18, 0.18, 1.0]
+                let bg_color = if is_selected { [0.25, 0.25, 0.25, 1.0] }
+                               else { [0.18, 0.18, 0.18, 1.0] };
+
+                let opt_interaction = Interaction {
+                    action: opt.action,
+                    hover_effect: HoverEffect::Highlight {
+                        bg_hover: if is_selected { [0.30, 0.30, 0.30, 1.0] }
+                                  else { [0.22, 0.22, 0.22, 1.0] },
+                        bg_pressed: [0.35, 0.35, 0.35, 1.0],
+                    },
+                    bounds: crate::Rect { x: box_x, y: opt_y, w: box_w, h },
                 };
+
                 prims.push(Primitive::Rect {
                     x: box_x, y: opt_y, w: box_w, h,
                     color: bg_color,
                     corner_radius: 0.0,
+                    interaction: Some(opt_interaction.clone()),
                 });
                 if is_selected {
                     prims.push(Primitive::Rect {
                         x: box_x + 2.0, y: opt_y + 4.0, w: 3.0, h: h - 8.0,
                         color: [0.0, 0.8, 0.2, 1.0],
                         corner_radius: 1.5,
+                        interaction: Some(opt_interaction.clone()),
                     });
                 }
-                let text_color = if is_selected {
-                    [1.0, 1.0, 1.0, 1.0]
-                } else {
-                    [0.8, 0.8, 0.8, 1.0]
-                };
+                let text_color = if is_selected { [1.0, 1.0, 1.0, 1.0] }
+                                 else { [0.8, 0.8, 0.8, 1.0] };
                 prims.push(Primitive::Text {
                     content: opt.label.clone(),
                     x: box_x + 12.0,
@@ -135,6 +135,7 @@ widget! {
                     size: this.style.text_size,
                     h_align: HorizontalAlign::Left,
                     v_align: VerticalAlign::Center,
+                    interaction: Some(opt_interaction.clone()),
                 });
                 if is_selected {
                     prims.push(Primitive::Text {
@@ -145,16 +146,9 @@ widget! {
                         size: this.style.text_size,
                         h_align: HorizontalAlign::Center,
                         v_align: VerticalAlign::Center,
+                        interaction: Some(opt_interaction.clone()),
                     });
                 }
-                hits.push(HitRegion {
-                    bounds: crate::Rect { x: box_x, y: opt_y, w: box_w, h },
-                    action: opt.action,
-                    hover: HoverEffect::Highlight {
-                        bg_hover: if is_selected { [0.30, 0.30, 0.30, 1.0] } else { [0.22, 0.22, 0.22, 1.0] },
-                        bg_pressed: [0.35, 0.35, 0.35, 1.0],
-                    },
-                });
                 opt_y += h;
             }
         }

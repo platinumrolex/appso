@@ -317,38 +317,22 @@ impl ApplicationHandler<AppEvent> for App {
         }
 
         if (self.core.mouse_moved || self.core.needs_redraw) && now >= next_frame_time {
-            if self.core.mouse_moved {
-                let pos = self.core.mouse_pos;
-                let delta = (pos.0 - self.core.frame_mouse_pos.0, pos.1 - self.core.frame_mouse_pos.1);
-                self.core.frame_mouse_pos = pos;
-                self.core.mouse_moved = false;
-
-                if !self.core.is_mouse_down {
-                    if let Some(win) = self.core.window.as_ref() {
-                        self.core.ui_state.update_zone(
-                            self.core.mouse_pos,
-                            win.inner_size().width as f32,
-                            &self.core.metrics,
-                            &mut self.engine.header,
-                        );
-                        // println!("[Zone]: {:?}", self.core.ui_state.zone);
+            if !self.core.is_mouse_down {
+                if let Some(win) = self.core.window.as_ref() {
+                    self.core.ui_state.update_zone(
+                        self.core.mouse_pos,
+                        win.inner_size().width as f32,
+                        &self.core.metrics,
+                        &mut self.engine.header,
+                    );
                     
                     let pos = self.core.mouse_pos;
                     let width = win.inner_size().width as f32;
 
                     let (action, hover) = match self.core.ui_state.zone {
                         UiZone::Runtime(RuntimeZone::Header) => {
-                            // Look for a hit in the header's cache
-                            let hit = self.engine.header.cached_hits.iter()
-                                .find(|h| h.bounds.contains(pos));
-                                
-                            match hit {
-                                Some(h) => (
-                                    RootAction::Runtime(RuntimeAction::Header(h.action)), 
-                                    Some(h.hover) // Extract ONLY the hover effect
-                                ),
-                                None => (RootAction::Runtime(RuntimeAction::Header(HeaderAction::Drag)), None),
-                            }
+                            let (hdr_action, hdr_hover) = self.engine.header.action_and_hover_at(pos, width, &self.core.metrics);
+                            (RootAction::Runtime(RuntimeAction::Header(hdr_action)), hdr_hover)
                         }
                         UiZone::App => {
                             if let Some(idx) = self.diagram.hit_test(&self.core.camera, pos) {
@@ -360,32 +344,9 @@ impl ApplicationHandler<AppEvent> for App {
                         _ => (RootAction::None, None),
                     };
 
-                    // Now this call is type-safe because 'hover' is just a HoverEffect enum
                     if self.core.ui_state.check_hovered(action, hover) {
                         self.core.needs_redraw = true;
                         println!("[Zone]: {:?} hover: {:?} - redraw request upon hovers/mousemove", action, hover);
-                    }
-
-                    }
-                }
-
-                match self.core.ui_state.zone {
-                    UiZone::Runtime(sub_zone) => {
-                        // Runtime zones (Header/Dropdown) – no app interaction needed
-                        match sub_zone {
-                            RuntimeZone::Header => {}
-                            RuntimeZone::Dropdown => {}
-                        }
-                    }
-                    UiZone::App => {
-                        self.diagram.handle_mousemove(
-                            &mut self.core.camera,
-                            pos,
-                            delta,
-                        );
-                        if self.diagram.current_drag.is_some() {
-                            self.core.needs_redraw = true;
-                        }
                     }
                 }
             }
