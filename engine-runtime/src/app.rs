@@ -594,7 +594,9 @@ impl ApplicationHandler<AppEvent> for App {
                                 }
                                 _ => {
                                     if self.engine.header.handle_action(&win, action) {
+                                        println!("button clicked, open");
                                         handled_by_ui = true;
+                                        win.request_redraw();
                                     }
                                 }
                             }

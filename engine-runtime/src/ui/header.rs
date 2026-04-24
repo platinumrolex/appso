@@ -116,10 +116,10 @@ impl EngineHeader {
         // (row_h removed, unused)
 
         let mut settings_style = ButtonStyle::icon();
-        if self.settings_dropdown_open {
-            settings_style.bg_idle = settings_style.bg_hover;
-            settings_style.text_idle = settings_style.text_hover;
-        }
+       // if self.settings_dropdown_open {
+       //     settings_style.bg_idle = settings_style.bg_hover;
+       //     settings_style.text_idle = settings_style.text_hover;
+       // }
 
         let mut primitives = ui! {
             root {
@@ -295,63 +295,80 @@ impl EngineHeader {
         changed
     }
 
-    pub fn get_background_rects(&mut self, window_width: f32, metrics: &ScaledMetrics, mouse_pos: (f32, f32), is_pressed: bool) -> Vec<(f32, f32, f32, f32, [f32; 4], f32)> {
-        self.ensure_cache(window_width, metrics, false);
-        let mut rects = Vec::new();
-        for prim in &self.cached_primitives {
-            if let Primitive::Rect { x, y, w, h, color, corner_radius, interaction } = prim {
-                let final_color = if let Some(inter) = interaction {
-                    let hovered = inter.bounds.contains(mouse_pos);
-                    inter.hover_effect.resolve_bg(hovered, is_pressed).unwrap_or(*color)
-                } else {
-                    *color
-                };
-                let radius = interaction.as_ref()
-                    .map(|i| i.hover_effect.corner_radius())
-                    .unwrap_or(*corner_radius);
+    pub fn get_background_rects(&mut self, window_width: f32, metrics: &ScaledMetrics,
+                            mouse_pos: (f32, f32), is_pressed: bool)
+                            -> Vec<(f32, f32, f32, f32, [f32; 4], f32)>
+{
+    self.ensure_cache(window_width, metrics, false);
+    let active_action = if self.settings_dropdown_open {
+        Some(HeaderAction::SettingsSelector)
+    } else {
+        None
+    };
+
+    let mut rects = Vec::new();
+    for prim in &self.cached_primitives {
+        if let Primitive::Rect { x, y, w, h, color, corner_radius, interaction } = prim {
+            if let Some(inter) = interaction {
+                let hovered = inter.bounds.contains(mouse_pos);
+                let is_active = active_action == Some(inter.action);
+                let final_color = inter.hover_effect.resolve_bg(hovered, is_pressed, is_active)
+                    .unwrap_or(*color);
+                let radius = inter.hover_effect.corner_radius();
                 if final_color[3] > 0.0 {
                     rects.push((*x, *y, *w, *h, final_color, radius));
                 }
+            } else {
+                // no interaction – use static color
+                if color[3] > 0.0 {
+                    rects.push((*x, *y, *w, *h, *color, *corner_radius));
+                }
             }
         }
-        rects
     }
-
-    pub fn sections<'a>(&'a mut self, window_width: f32, is_maximized: bool, mouse_pos: (f32, f32), active_zone: UiZone, metrics: &ScaledMetrics) -> Vec<Section<'a>> {
-        self.ensure_cache(window_width, metrics, is_maximized);
-        let scale = metrics.scale;
-        let is_header_active = matches!(active_zone, UiZone::Runtime(_));
-        let effective_mouse = if is_header_active { mouse_pos } else { (-1.0, -1.0) };
-
-        let mut sections = Vec::new();
-        for prim in &self.cached_primitives {
-            if let Primitive::Text { content, x, y, color, size, h_align, v_align, interaction } = prim {
-                let text_color = if let Some(inter) = interaction {
-                    let hovered = inter.bounds.contains(effective_mouse);
-                    inter.hover_effect.resolve_text(hovered).unwrap_or(*color)
-                } else {
-                    *color
-                };
-                sections.push(
-                    Section::default()
-                        .add_text(
-                            Text::new(content)
-                                .with_color(text_color)
-                                .with_scale(*size * scale)
-                        )
-                        .with_screen_position((*x, *y))
-                        .with_layout(
-                            Layout::default()
-                                .h_align(*h_align)
-                                .v_align(*v_align)
-                        )
-                );
-            }
-        }
-        sections
-    }
+    rects
 }
 
+   pub fn sections<'a>(&'a mut self, window_width: f32, is_maximized: bool,
+                    mouse_pos: (f32, f32), active_zone: UiZone, metrics: &ScaledMetrics)
+                    -> Vec<Section<'a>>
+{
+    self.ensure_cache(window_width, metrics, is_maximized);
+    let scale = metrics.scale;
+    let is_header_active = matches!(active_zone, UiZone::Runtime(_));
+    let effective_mouse = if is_header_active { mouse_pos } else { (-1.0, -1.0) };
+
+    let active_action = if self.settings_dropdown_open {
+        Some(HeaderAction::SettingsSelector)
+    } else {
+        None
+    };
+
+    let mut sections = Vec::new();
+    for prim in &self.cached_primitives {
+        if let Primitive::Text { content, x, y, color, size, h_align, v_align, interaction } = prim {
+            let text_color = if let Some(inter) = interaction {
+                let hovered = inter.bounds.contains(effective_mouse);
+                let is_active = active_action == Some(inter.action);
+                inter.hover_effect.resolve_text(hovered, is_active).unwrap_or(*color)
+            } else {
+                *color
+            };
+            sections.push(
+                Section::default()
+                    .add_text(
+                        Text::new(content)
+                            .with_color(text_color)
+                            .with_scale(*size * scale)
+                    )
+                    .with_screen_position((*x, *y))
+                    .with_layout(Layout::default().h_align(*h_align).v_align(*v_align))
+            );
+        }
+    }
+    sections
+}
+}
 // Helper to extract interaction (works for both Rect and Text)
 fn get_interaction<A>(prim: &Primitive<A>) -> Option<&Interaction<A>> {
     match prim {
