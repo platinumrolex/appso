@@ -326,6 +326,12 @@ impl ApplicationHandler<AppEvent> for App {
         }
 
         if (self.core.mouse_moved || self.core.needs_redraw) && now >= next_frame_time {
+            if self.core.mouse_moved {
+                let pos = self.core.mouse_pos;
+                let delta = (pos.0 - self.core.frame_mouse_pos.0, pos.1 - self.core.frame_mouse_pos.1);
+                self.core.frame_mouse_pos = pos;
+                self.core.mouse_moved = false;
+            
             if !self.core.is_mouse_down {
                 if let Some(win) = self.core.window.as_ref() {
                     self.core.ui_state.update_zone(
@@ -335,7 +341,6 @@ impl ApplicationHandler<AppEvent> for App {
                         &mut self.engine.header,
                     );
                     
-                    let pos = self.core.mouse_pos;
                     let width = win.inner_size().width as f32;
 
                     let (action, hover) = match self.core.ui_state.zone {
@@ -360,6 +365,26 @@ impl ApplicationHandler<AppEvent> for App {
                 }
             }
 
+            match self.core.ui_state.zone {
+                    UiZone::Runtime(sub_zone) => {
+                        // Runtime zones (Header/Dropdown) – no app interaction needed
+                        match sub_zone {
+                            RuntimeZone::Header => {}
+                            RuntimeZone::Dropdown => {}
+                        }
+                    }
+                    UiZone::App => {
+                        self.diagram.handle_mousemove(
+                            &mut self.core.camera,
+                            pos,
+                            delta,
+                        );
+                        if self.diagram.current_drag.is_some() {
+                            self.core.needs_redraw = true;
+                        }
+                    }
+                }
+            }
             if self.core.needs_redraw {
                 self.core.last_frame_time = next_frame_time;
                 self.core.logic_count += 1;
