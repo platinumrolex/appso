@@ -31,6 +31,10 @@ structure:
             └── 📁src
                 ├── lib.rs
             ├── Cargo.toml
+        └── 📁nested_enum_macros
+            └── 📁src
+                ├── lib.rs
+            ├── Cargo.toml
         └── 📁wgpu-ui
             └── 📁src
                 └── 📁widgets
