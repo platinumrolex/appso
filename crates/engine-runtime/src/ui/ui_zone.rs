@@ -29,7 +29,7 @@ pub enum RootAction<T: UiAction> {
 // Internal Engine UI Actions
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RuntimeAction {
-    Header(HeaderAction),
+    Header(EngineHeaderAction),
    // Sidebar(SidebarAction),
     // Dropdown is usually handled via Header state or its own variant
 }
@@ -55,7 +55,7 @@ pub struct InteractionState<A: UiAction> {
     pub active: Vec<A>,
     pub is_hover_visual: bool,
 }
-use crate::ui::header::HeaderAction;
+use crate::ui::header::EngineHeaderAction;
  use wgpu_ui::primitives::UiAction;
 
 impl<A: UiAction> InteractionState<A> {

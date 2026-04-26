@@ -1,28 +1,12 @@
 #[macro_export]
 macro_rules! ui {
-    // -------------------------------------------------------------------------
-    // PERFORMANCE ENTRY POINT: Render directly into an existing &mut Vec
-    // Usage: ui!(@to my_primitives_vec, { root { ... } });
-    // -------------------------------------------------------------------------
-    (@to $prims:ident, { $($body:tt)* }) => {
-        $crate::ui!(@parse $prims, $($body)*);
-    };
-
-    // Standard entry point (allocates new Vec - use sparingly)
     (root { $($body:tt)* }) => {{
         let mut primitives = Vec::new();
         $crate::ui!(@parse primitives, $($body)*);
         primitives
     }};
 
-    // Base case: end of parsing
     (@parse $prims:ident, $(,)?) => {};
-
-    // Support nested 'root' block often used in blueprints
-    (@parse $prims:ident, root { $($body:tt)* } $($rest:tt)*) => {
-        $crate::ui!(@parse $prims, $($body)*);
-        $crate::ui!(@parse $prims, $($rest)*);
-    };
 
     // Standard widget arm
     (@parse $prims:ident,
@@ -40,17 +24,9 @@ macro_rules! ui {
         };
         #[allow(unused_imports)]
         use $crate::Widget as _;
-        widget.render($prims);
+        widget.render(&mut $prims);
         $crate::ui!(@parse $prims, $($rest)*);
     }};
-
-    // Dropdown/Selector Zone Parsing
-    (@parse $prims:ident,
-        $id:ident { $($body:tt)* } $($rest:tt)*
-    ) => {
-        $crate::ui!(@parse $prims, $($body)*);
-        $crate::ui!(@parse $prims, $($rest)*);
-    };
 
     // Container arm
     (@parse $prims:ident,
@@ -64,11 +40,10 @@ macro_rules! ui {
             .build();
         #[allow(unused_imports)]
         use $crate::Widget as _;
-        widget.render($prims);
+        widget.render(&mut $prims);
         $crate::ui!(@parse $prims, $($rest)*);
     }};
 
-    // Children parsing logic
     (@parse_children $($body:tt)*) => {{
         let mut children: Vec<Box<dyn $crate::Widget<_>>> = Vec::new();
         $crate::ui!(@collect_children children, $($body)*);

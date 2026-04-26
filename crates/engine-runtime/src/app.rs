@@ -13,7 +13,7 @@ use engine_sdk::{Camera, INITIAL_WORLD_POS};
 use engine_runtime::{
     core::{init_graphics, get_window_refresh_rate, WgpuState},
     ui::{ui,
-        header::{EngineHeader, ScaledMetrics, HeaderAction, FpsLimit},
+        header::{EngineHeader, ScaledMetrics, EngineHeaderAction, FpsLimit},
         ui_zone::{determine_active_zone, UiZone, RuntimeZone},
         window,
     },
@@ -604,7 +604,7 @@ impl ApplicationHandler<AppEvent> for App {
                         );
                         // close menues
                         if !matches!(self.core.ui_state.zone, UiZone::Runtime(RuntimeZone::Dropdown)) 
-                            && action != HeaderAction::SettingsSelector {
+                            && action != EngineHeaderAction::ToggleSettings {
                             self.engine.header.settings_dropdown_open = false;
                             self.engine.header.fps_selector_open = false;
                           //  self.engine.header.invalidate_menu();
@@ -614,7 +614,7 @@ impl ApplicationHandler<AppEvent> for App {
 
                         if button == MouseButton::Left {
                             match action {
-                                HeaderAction::Close => {
+                                EngineHeaderAction::CloseWindow => {
                                     event_loop.exit();
                                     return;
                                 }
