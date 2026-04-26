@@ -386,6 +386,7 @@ version = "0.1.0"
 dependencies = [
  "diagram-app",
  "engine-sdk",
+ "nested_enum_macros",
  "pollster",
  "wgpu",
  "wgpu-ui",
@@ -889,6 +890,10 @@ checksum = "ee6cda3051665f1fb8d9e08fc35c96d5a244fb1be711a03b71118828afc9a873"
 dependencies = [
  "jni-sys 0.3.1",
 ]
+
+[[package]]
+name = "nested_enum_macros"
+version = "0.1.0"
 
 [[package]]
 name = "num-traits"

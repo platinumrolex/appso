@@ -1,12 +1,12 @@
-[workspace]
-members = [
-    "crates/engine-runtime",
-    "crates/engine-sdk",
-    "crates/apps/*",
-    "crates/nested_enum_macros",
-]
-resolver = "2"
+[package]
+name = "nested_enum_macros"
+version = "0.1.0"
+edition = "2021"
 
+[lib]
+proc-macro = true
+
+# No dependencies – only the built‑in proc_macro
 [profile.release]
 # Maximize performance for your game loop
 opt-level = 3

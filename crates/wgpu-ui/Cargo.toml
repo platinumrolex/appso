@@ -1,11 +1,12 @@
-[workspace]
-members = [
-    "crates/engine-runtime",
-    "crates/engine-sdk",
-    "crates/apps/*",
-    "crates/nested_enum_macros",
-]
-resolver = "2"
+[package]
+name = "wgpu-ui"
+version = "0.1.0"
+edition = "2021"
+description = "Declarative UI primitives and macros for WGPU applications"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+wgpu_text = "29.0.0"
 
 [profile.release]
 # Maximize performance for your game loop
