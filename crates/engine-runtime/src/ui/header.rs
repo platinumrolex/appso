@@ -8,7 +8,7 @@ use wgpu_ui::{
 };
 use wgpu_ui::primitives::UiAction;
 
-use crate::ui::ui_zone::{RuntimeZone, UiZone};
+use crate::ui::ui_zone::UiZone;
 use nested_enum_macros::ui_blueprint;
 
 pub const BASE_HEADER_H: f32 = 32.0;
@@ -86,10 +86,12 @@ impl EngineHeader {
 
 // -----------------------------------------------------------------------------
 // THE UNIFIED BLUEPRINT
-// Generates EngineHeaderAction and injects all UI logic.
+// Generates EngineHeaderAction, RuntimeZone, and injects all UI logic.
 // -----------------------------------------------------------------------------
 ui_blueprint! {
-    EngineHeader {
+    EngineHeader,
+    zones: RuntimeZone,
+    {
         
         // 1. HIGH-PERFORMANCE RENDER
         pub fn render_ui(&self, primitives: &mut Vec<Primitive<EngineHeaderAction>>, window_width: f32, metrics: &ScaledMetrics, is_maximized: bool) {
@@ -105,7 +107,7 @@ ui_blueprint! {
             let dropdown_x = settings_x - (160.0 * scale);
 
             ui!(@to primitives, {
-                root {
+                Header {
                     title: CustomTitle {
                         text: self.title.clone(),
                         size: 13.0,
@@ -148,7 +150,7 @@ ui_blueprint! {
                 ];
 
                 ui!(@to primitives, {
-                    dropdown_zone {
+                    Dropdown {
                         fps_selector: Selector {
                             label: "Frame limit".into(),
                             current: self.current_fps.label().into(), 

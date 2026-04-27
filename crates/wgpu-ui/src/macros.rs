@@ -8,13 +8,6 @@ macro_rules! ui {
         $crate::ui!(@parse $prims, $($body)*);
     };
 
-    // Standard entry point (allocates new Vec - use sparingly)
-    (root { $($body:tt)* }) => {{
-        let mut primitives = Vec::new();
-        $crate::ui!(@parse primitives, $($body)*);
-        primitives
-    }};
-
     // Base case: end of parsing
     (@parse $prims:ident, $(,)?) => {};
 
@@ -23,6 +16,22 @@ macro_rules! ui {
         $crate::ui!(@parse $prims, $($body)*);
         $crate::ui!(@parse $prims, $($rest)*);
     };
+
+    // Container arm (must come BEFORE the generic $id:ident { ... } arm)
+    (@parse $prims:ident,
+        $id:ident : Container {
+        } children: { $($children:tt)* }
+        $($rest:tt)*
+    ) => {{
+        let children_widgets = $crate::ui!(@parse_children $($children)*);
+        let widget = $crate::widgets::Container::builder($crate::Rect::default())
+            .children(children_widgets)
+            .build();
+        #[allow(unused_imports)]
+        use $crate::Widget as _;
+        widget.render($prims);
+        $crate::ui!(@parse $prims, $($rest)*);
+    }};
 
     // Standard widget arm
     (@parse $prims:ident,
@@ -44,29 +53,14 @@ macro_rules! ui {
         $crate::ui!(@parse $prims, $($rest)*);
     }};
 
-    // Dropdown/Selector Zone Parsing
+    // Generic zone arm – matches Header { ... }, Dropdown { ... }, etc.
+    // (any identifier directly followed by a brace block)
     (@parse $prims:ident,
         $id:ident { $($body:tt)* } $($rest:tt)*
     ) => {
         $crate::ui!(@parse $prims, $($body)*);
         $crate::ui!(@parse $prims, $($rest)*);
     };
-
-    // Container arm
-    (@parse $prims:ident,
-        $id:ident : Container {
-        } children: { $($children:tt)* }
-        $($rest:tt)*
-    ) => {{
-        let children_widgets = $crate::ui!(@parse_children $($children)*);
-        let widget = $crate::widgets::Container::builder($crate::Rect::default())
-            .children(children_widgets)
-            .build();
-        #[allow(unused_imports)]
-        use $crate::Widget as _;
-        widget.render($prims);
-        $crate::ui!(@parse $prims, $($rest)*);
-    }};
 
     // Children parsing logic
     (@parse_children $($body:tt)*) => {{
@@ -93,4 +87,15 @@ macro_rules! ui {
     }};
 
     (@collect_children $vec:ident, $(,)?) => {};
+
+    // =========================================================================
+    // Standard entry point (allocates new Vec - use sparingly)
+    // MUST BE AT THE BOTTOM so it doesn't accidentally intercept internal @parse 
+    // or @collect invocations, which are valid tt streams!
+    // =========================================================================
+    ($($body:tt)+) => {{
+        let mut primitives = Vec::new();
+        $crate::ui!(@parse primitives, $($body)+);
+        primitives
+    }};
 }

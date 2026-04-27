@@ -26,7 +26,8 @@ pub mod ui_zone;
 pub mod window;
 
 pub use header::EngineHeader;
-pub use ui_zone::{determine_active_zone,  UiZone, RuntimeZone};
+pub use header::RuntimeZone;
+pub use ui_zone::{determine_active_zone,  UiZone};
 pub use window::{create_window, apply_platform_style};
 
 // Re-export wgpu_ui for convenience

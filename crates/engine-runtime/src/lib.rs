@@ -1,9 +1,9 @@
+#![recursion_limit = "4096"]
 pub mod core;
 pub mod ui;
 
-use ui::header::{EngineHeader, ScaledMetrics};
-use ui::ui_zone::{determine_active_zone, UiZone, RuntimeZone};
-
+use ui::header::{EngineHeader, ScaledMetrics, RuntimeZone};
+use ui::ui_zone::{determine_active_zone, UiZone};
 
 pub use core::frame_delay::calculate_frame_delay;
 pub use core::graphics::{init_graphics, get_window_refresh_rate, WgpuState};

@@ -1,5 +1,5 @@
-use crate::ui::header::{EngineHeader, ScaledMetrics};
-use wgpu_ui::HoverEffect;
+use crate::ui::header::{EngineHeader, EngineHeaderAction, RuntimeZone, ScaledMetrics};
+use wgpu_ui::{HoverEffect, primitives::UiAction};
 
 // top level ui zone
 #[derive(PartialEq, Eq, Debug, Clone, Copy, Default)]
@@ -7,13 +7,6 @@ pub enum UiZone {
     Runtime(RuntimeZone),
     #[default]
     App,
-}
-
-#[derive(PartialEq, Eq, Debug, Clone, Copy, Default)]
-pub enum RuntimeZone {
-    #[default]
-    Header,
-    Dropdown,
 }
 
 // The top-level action that InteractionState will track
@@ -25,7 +18,6 @@ pub enum RootAction<T: UiAction> {
     None,
 }
 
-
 // Internal Engine UI Actions
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RuntimeAction {
@@ -33,6 +25,7 @@ pub enum RuntimeAction {
    // Sidebar(SidebarAction),
     // Dropdown is usually handled via Header state or its own variant
 }
+
 // Implementation of the Trait for the Root
 impl<T: UiAction> UiAction for RootAction<T> {
     fn is_interactive(&self) -> bool {
@@ -47,7 +40,6 @@ impl<T: UiAction> UiAction for RootAction<T> {
     }
 }
 
-
 #[derive(Default, Debug, Clone)]
 pub struct InteractionState<A: UiAction> {
     pub zone: UiZone,
@@ -55,8 +47,6 @@ pub struct InteractionState<A: UiAction> {
     pub active: Vec<A>,
     pub is_hover_visual: bool,
 }
-use crate::ui::header::EngineHeaderAction;
- use wgpu_ui::primitives::UiAction;
 
 impl<A: UiAction> InteractionState<A> {
     /// 1. Updates the high-level zone and returns true if it changed
@@ -67,7 +57,7 @@ impl<A: UiAction> InteractionState<A> {
         };
     }
 
-  pub fn check_hovered(&mut self, next_action: A, hover_data: Option<HoverEffect>) -> bool {
+    pub fn check_hovered(&mut self, next_action: A, hover_data: Option<HoverEffect>) -> bool {
         let action_changed = self.hovered != Some(next_action);
         
         // Does the current region have a visual hover state?
@@ -94,19 +84,6 @@ impl<A: UiAction> InteractionState<A> {
         self.hovered = None;
         self.is_hover_visual = false;
     }
-
-    // pub fn update_zone(&mut self, header: &mut EngineHeader, mouse: (f32, f32), width: f32, metrics: &ScaledMetrics) -> bool {
-    //     let next_zone = header.zone_at(mouse, width, metrics);
-    //     let changed = next_zone != self.zone;
-    //     self.zone = next_zone;
-    //     changed
-    // }
-
-// 
-    // // 3. Sets the active (clicked) state
-    // pub fn update_active(&mut self, action: Option<HeaderAction>) {
-    //     self.active = action;
-    // }
 }
 
 /// Determines which logical UI zone the mouse currently occupies.
@@ -122,50 +99,3 @@ pub fn determine_active_zone(
         None => UiZone::App,
     }
 }
-
-
-
-
-
-
-
-// use crate::ui::header::{EngineHeader, ScaledMetrics, BASE_HEADER_H};
-// 
-// #[derive(PartialEq, Eq, Debug, Clone, Copy)]
-// pub enum UiZone {
-//     Runtime(RuntimeZone),
-//     App,
-// }
-// 
-// #[derive(PartialEq, Eq, Debug, Clone, Copy)]
-// pub enum RuntimeZone {
-//     Header,
-//     Dropdown,
-// }
-// 
-// pub fn determine_active_zone(
-//     mouse_pos: (f32, f32),
-//     screen_width: f32,
-//     scale_factor: f32,
-//     header: &EngineHeader,
-//     metrics: &ScaledMetrics
-// ) -> UiZone {
-//     if header.settings_dropdown_open {
-//         let settings_x = screen_width - (metrics.btn_w * 4.0); 
-//         let dropdown_x = settings_x - (160.0 * scale_factor);
-//         let base_menu_h = 60.0 * scale_factor; 
-//         let expanded_list_h = if header.fps_selector_open { 5.0 * metrics.row_h } else { 0.0 };
-//         let total_dropdown_h = base_menu_h + expanded_list_h;
-// 
-//         if mouse_pos.0 >= dropdown_x && mouse_pos.0 <= dropdown_x + metrics.dropdown_w
-//            && mouse_pos.1 > metrics.header_h && mouse_pos.1 <= metrics.header_h + total_dropdown_h {
-//             return UiZone::Runtime(RuntimeZone::Dropdown);
-//         }
-//     }
-// 
-//     if mouse_pos.1 <= metrics.header_h {
-//         return UiZone::Runtime(RuntimeZone::Header);
-//     }
-// 
-//     UiZone::App
-// }

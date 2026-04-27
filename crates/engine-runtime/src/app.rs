@@ -13,8 +13,8 @@ use engine_sdk::{Camera, INITIAL_WORLD_POS};
 use engine_runtime::{
     core::{init_graphics, get_window_refresh_rate, WgpuState},
     ui::{ui,
-        header::{EngineHeader, ScaledMetrics, EngineHeaderAction, FpsLimit},
-        ui_zone::{determine_active_zone, UiZone, RuntimeZone},
+        header::{EngineHeader, ScaledMetrics, EngineHeaderAction, FpsLimit, RuntimeZone},
+        ui_zone::{determine_active_zone, UiZone},
         window,
     },
     EngineState,
