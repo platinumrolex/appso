@@ -1,5 +1,8 @@
 # appso
 
+NOTICE: ALL RIGHTS RESERVED
+This repository is for demonstration/viewing purposes only. The source code is copyrighted and provided for reference only. No license is granted for use, modification, distribution, or commercial exploitation.
+
 structure:
 ```
 └── 📁appso
