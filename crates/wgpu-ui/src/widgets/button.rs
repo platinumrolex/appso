@@ -37,3 +37,84 @@ widget! {
         });
     }
 }
+
+
+
+#[macro_export]
+macro_rules! button {
+    // NO STYLE
+    (@render $prims:expr, $action_ty:ident,
+        $label:expr,
+        @$action:ident,
+        $style:ident,
+        pos($x:expr, $y:expr, $w:expr, $h:expr)
+    ) => {{
+        let bounds = $crate::Rect { x: $x, y: $y, w: $w, h: $h };
+        let style = $crate::ButtonStyle::$style();
+
+        let widget = $crate::Button::builder(bounds)
+            .label($label.into())
+            .action($action_ty::$action)
+            .style(style)
+            .build();
+
+        use $crate::Widget as _;
+        widget.render($prims);
+    }};
+
+    // EMPTY {}
+    (@render $prims:expr, $action_ty:ident,
+        $label:expr,
+        @$action:ident,
+        $style:ident { },
+        pos($x:expr, $y:expr, $w:expr, $h:expr)
+    ) => {{
+        let bounds = $crate::Rect { x: $x, y: $y, w: $w, h: $h };
+        let style = $crate::ButtonStyle::$style();
+
+        let widget = $crate::Button::builder(bounds)
+            .label($label.into())
+            .action($action_ty::$action)
+            .style(style)
+            .build();
+
+        use $crate::Widget as _;
+        widget.render($prims);
+    }};
+
+    // WITH ARGS
+    (@render $prims:expr, $action_ty:ident,
+        $label:expr,
+        @$action:ident,
+        $style:ident { $($style_args:tt)+ },
+        pos($x:expr, $y:expr, $w:expr, $h:expr)
+    ) => {{
+        let bounds = $crate::Rect { x: $x, y: $y, w: $w, h: $h };
+        let mut style = $crate::ButtonStyle::$style();
+
+        $crate::button!(@apply style, $($style_args)+,);
+
+        let widget = $crate::Button::builder(bounds)
+            .label($label.into())
+            .action($action_ty::$action)
+            .style(style)
+            .build();
+
+        use $crate::Widget as _;
+        widget.render($prims);
+    }};
+
+    // ----------------------------------------
+    // BASE CASES
+    // ----------------------------------------
+    (@apply $style:ident,) => {};
+    (@apply $style:ident) => {}; // ← IMPORTANT (handles no trailing comma)
+
+    // ----------------------------------------
+    // FIELD: text_size
+    // ----------------------------------------
+    (@apply $style:ident, text_size : $val:expr $(, $($rest:tt)*)? ) => {{
+        $style.text_size = $val;
+        $crate::button!(@apply $style $(, $($rest)*)?);
+    }};
+}

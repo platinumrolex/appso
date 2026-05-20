@@ -71,3 +71,4 @@ macro_rules! widget {
         panic!(concat!("Missing required field: ", stringify!($field)))
     };
 }
+

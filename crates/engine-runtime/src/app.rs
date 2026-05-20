@@ -606,7 +606,7 @@ impl ApplicationHandler<AppEvent> for App {
                         if !matches!(self.core.ui_state.zone, UiZone::Runtime(RuntimeZone::Dropdown)) 
                             && action != EngineHeaderAction::ToggleSettings {
                             self.engine.header.settings_dropdown_open = false;
-                            self.engine.header.fps_selector_open = false;
+                           //>> self.engine.header.fps_selector_open = false;
                           //  self.engine.header.invalidate_menu();
                         }
 

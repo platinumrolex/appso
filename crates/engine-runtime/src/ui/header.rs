@@ -3,11 +3,11 @@ use std::borrow::Cow;
 use wgpu_text::glyph_brush::{Layout, Section, Text};
 use winit::window::Window;
 use wgpu_ui::{
-    ui, ButtonStyle, Primitive, HoverEffect, Rect,
+    ui, section, title, button, ButtonStyle, Primitive, HoverEffect, Rect,
     Button, CustomTitle, Selector, SelectorOption, Container, Interaction
 };
 use wgpu_ui::primitives::UiAction;
-
+use wgpu_ui::Widget;
 use crate::ui::ui_zone::UiZone;
 use nested_enum_macros::ui_blueprint;
 
@@ -54,7 +54,7 @@ impl ScaledMetrics {
 pub struct EngineHeader {
     pub title: String,
     pub settings_dropdown_open: bool,
-    pub fps_selector_open: bool,
+    pub __open_selectors: std::collections::HashSet<&'static str>,
     pub settings_attention: SettingsAttention,
     pub current_fps: FpsLimit,
     
@@ -69,7 +69,7 @@ impl EngineHeader {
         Self {
             title: title.into(),
             settings_dropdown_open: false,
-            fps_selector_open: false,
+            __open_selectors: Default::default(),
             settings_attention: SettingsAttention::None,
             current_fps: FpsLimit { value: 144, is_auto: true },
             cached_primitives: Vec::new(),
@@ -106,42 +106,88 @@ ui_blueprint! {
             let close_x = window_width - btn_w;
             let dropdown_x = settings_x - (160.0 * scale);
 
-            ui!(@to primitives, {
-                Header {
-                    title: CustomTitle {
-                        text: self.title.clone(),
-                        size: 13.0,
-                        color: [0.9, 0.9, 0.9, 1.0],
-                    } at (16.0 * scale, 9.0 * scale, 0.0, 0.0)
-
-                    settings_btn: Button {
-                        label: "0".into(),
-                        action: EngineHeaderAction::ToggleSettings, 
-                        style: ButtonStyle::icon(),
-                    } at (settings_x, 0.0, btn_w, header_h)
-
-                    minimize_btn: Button {
-                        label: "─".into(),
-                        action: EngineHeaderAction::MinimizeWindow,
-                        style: ButtonStyle::icon(),
-                    } at (min_x, 0.0, btn_w, header_h)
-
-                    maximize_btn: Button {
-                        label: if is_maximized { "1".into() } else { "2".into() },
-                        action: EngineHeaderAction::MaximizeWindow,
-                        style: ButtonStyle::icon(),
-                    } at (max_x, 0.0, btn_w, header_h)
-
-                    close_btn: Button {
-                        label: "X".into(),
-                        action: EngineHeaderAction::CloseWindow,
-                        style: ButtonStyle::danger(),
-                    } at (close_x, 0.0, btn_w, header_h)
-                }
+            primitives.push(Primitive::Rect {
+                x: 0.0,
+                y: 0.0,
+                w: 100.0,
+                h: 100.0,
+                color: [1.0, 0.0, 0.0, 1.0],
+                corner_radius: 0.0,
+                interaction: None,
             });
 
+          //  *primitives = section!(Action = EngineHeaderAction,
+          //      Header {
+          //          title!(self.title.clone(), pos(16.0 * scale, 9.0 * scale)),
+//
+          //          button!("0", @ToggleSettings, icon { text_size: 16.0 }, pos(settings_x, 0.0, btn_w, header_h)),
+//
+          //          button!("─", @MinimizeWindow, icon {}, pos(min_x, 0.0, btn_w, header_h)),
+//
+          //          button!(
+          //              if is_maximized { "1" } else { "2" },
+          //              @MaximizeWindow,
+          //              icon {},
+          //              pos(max_x, 0.0, btn_w, header_h)
+          //          ),
+//
+          //          button!("X", @CloseWindow, danger {}, pos(close_x, 0.0, btn_w, header_h)),
+          //      }
+          //  );
+
+            *primitives = section!(Action = EngineHeaderAction,
+                Header {
+                    title(self.title.clone(), pos(16.0 * scale, 9.0 * scale)),
+                    button("0", @ToggleSettings, icon { text_size: 16.0 }, pos(settings_x, 0.0, btn_w, header_h)),
+                    button("─", @MinimizeWindow, icon {},  pos(min_x, 0.0, btn_w, header_h)),
+                    button(
+                        if is_maximized { "1" } else { "2" },
+                        @MaximizeWindow,
+                        icon {},
+                        pos(max_x, 0.0, btn_w, header_h)
+                    ),
+                    button("X", @CloseWindow, danger {}, pos(close_x, 0.0, btn_w, header_h)),
+                }
+            );
+
+         //   ui!(@to primitives, {
+         //       Header {
+         //           title: CustomTitle {
+         //               text: self.title.clone(),
+         //               size: 13.0,
+         //               color: [0.9, 0.9, 0.9, 1.0],
+         //           } at (16.0 * scale, 9.0 * scale, 0.0, 0.0)
+//
+         //           settings_btn: Button {
+         //               label: "0".into(),
+         //               action: EngineHeaderAction::ToggleSettings, 
+         //               style: ButtonStyle::icon(),
+         //           } at (settings_x, 0.0, btn_w, header_h)
+//
+         //           minimize_btn: Button {
+         //               label: "─".into(),
+         //               action: EngineHeaderAction::MinimizeWindow,
+         //               style: ButtonStyle::icon(),
+         //           } at (min_x, 0.0, btn_w, header_h)
+//
+         //           maximize_btn: Button {
+         //               label: if is_maximized { "1".into() } else { "2".into() },
+         //               action: EngineHeaderAction::MaximizeWindow,
+         //               style: ButtonStyle::icon(),
+         //           } at (max_x, 0.0, btn_w, header_h)
+//
+         //           close_btn: Button {
+         //               label: "X".into(),
+         //               action: EngineHeaderAction::CloseWindow,
+         //               style: ButtonStyle::danger(),
+         //           } at (close_x, 0.0, btn_w, header_h)
+         //       }
+         //   });
+
+         
+
             if self.settings_dropdown_open {
-                let options = vec![
+                let frame_options = vec![
                     SelectorOption { label: "Auto (Sync)".into(), selected: self.current_fps.is_auto, action: EngineHeaderAction::SetFpsAuto },
                     SelectorOption { label: "30 FPS".into(), selected: !self.current_fps.is_auto && self.current_fps.value == 30, action: EngineHeaderAction::SetFps30 },
                     SelectorOption { label: "60 FPS".into(), selected: !self.current_fps.is_auto && self.current_fps.value == 60, action: EngineHeaderAction::SetFps60 },
@@ -149,18 +195,23 @@ ui_blueprint! {
                     SelectorOption { label: "240 FPS".into(), selected: !self.current_fps.is_auto && self.current_fps.value == 240, action: EngineHeaderAction::SetFps240 },
                 ];
 
-                ui!(@to primitives, {
+                ui!(@to self, primitives, {
+                // ui!(@to primitives, {
                     Dropdown {
                         fps_selector: Selector {
                             label: "Frame limit".into(),
-                            current: self.current_fps.label().into(), 
-                            toggle_action: EngineHeaderAction::ToggleFpsMenu,
-                            expanded: self.fps_selector_open,
-                            style: ButtonStyle::primary(),
-                            options: options,
+                            current: self.current_fps.label().into(),
+                            options: frame_options.clone(),
                         } at (dropdown_x, header_h, 240.0 * scale, 28.0 * scale)
+
+                        second_selector: Selector {
+                            label: "2nd Setting".into(),
+                            current: "Auto".into(),
+                            options: frame_options,
+                        } at (dropdown_x, header_h + (28.0 * scale), 240.0 * scale, 28.0 * scale) 
                     }
                 });
+
             }
 
             if self.settings_attention != SettingsAttention::None {
@@ -187,19 +238,24 @@ ui_blueprint! {
             match action {
                 EngineHeaderAction::ToggleSettings => {
                     self.settings_dropdown_open = !self.settings_dropdown_open;
-                    if !self.settings_dropdown_open { self.fps_selector_open = false; }
+                    if !self.settings_dropdown_open {
+                        self.__open_selectors.clear();
+                    }
                 }
-                EngineHeaderAction::ToggleFpsMenu => { self.fps_selector_open = !self.fps_selector_open; }
-                EngineHeaderAction::SetFpsAuto => { self.current_fps.is_auto = true; self.fps_selector_open = false; }
-                EngineHeaderAction::SetFps30   => { self.current_fps = FpsLimit { value: 30, is_auto: false }; self.fps_selector_open = false; }
-                EngineHeaderAction::SetFps60   => { self.current_fps = FpsLimit { value: 60, is_auto: false }; self.fps_selector_open = false; }
-                EngineHeaderAction::SetFps144  => { self.current_fps = FpsLimit { value: 144, is_auto: false }; self.fps_selector_open = false; }
-                EngineHeaderAction::SetFps240  => { self.current_fps = FpsLimit { value: 240, is_auto: false }; self.fps_selector_open = false; }
+                EngineHeaderAction::ToggleSelector(id) => {
+                    self.toggle_selector(id);
+                }
+                EngineHeaderAction::SetFpsAuto => { self.current_fps.is_auto = true; self.close_selector("fps_selector");}
+                EngineHeaderAction::SetFps30   => { self.current_fps = FpsLimit { value: 30, is_auto: false }; self.close_selector("fps_selector");}
+                EngineHeaderAction::SetFps60   => { self.current_fps = FpsLimit { value: 60, is_auto: false }; self.close_selector("fps_selector");}
+                EngineHeaderAction::SetFps144  => { self.current_fps = FpsLimit { value: 144, is_auto: false }; self.close_selector("fps_selector");}
+                EngineHeaderAction::SetFps240  => { self.current_fps = FpsLimit { value: 240, is_auto: false }; self.close_selector("fps_selector");}
                 EngineHeaderAction::MinimizeWindow => { window.set_minimized(true); }
                 EngineHeaderAction::MaximizeWindow => { window.set_maximized(!window.is_maximized()); }
                 EngineHeaderAction::CloseWindow => { /* close logic */ }
                 EngineHeaderAction::Drag => { let _ = window.drag_window(); }
                 EngineHeaderAction::None => { changed = false; }
+                EngineHeaderAction::CloseSelectors => {self.__open_selectors.clear();}
             }
             if changed { self.invalidate_cache(); }
             changed
@@ -231,10 +287,28 @@ ui_blueprint! {
                 let btn_w = metrics.btn_w;
                 let settings_x = window_width - (btn_w * 4.0);
                 let dropdown_x = settings_x - (160.0 * scale);
-                let dropdown_w = 240.0 * scale; 
+                let dropdown_w = 120.0 + (240.0 * scale);
                 let base_menu_h = 28.0 * scale;
-                let expanded_list_h = if self.fps_selector_open { 5.0 * 28.0 * scale } else { 0.0 };
-                let total_h = base_menu_h + expanded_list_h;
+              //  let expanded_list_h =
+              //      if self.selector_open("fps_selector") {
+              //          5.0 * 28.0 * scale
+              //      } else {
+              //          0.0
+              //      };
+              //  let total_h = base_menu_h + expanded_list_h;
+              let row_h = 28.0 * scale;
+
+                let selector_count = 2.0;
+
+                let mut total_h = row_h * selector_count;
+
+                if self.selector_open("fps_selector") {
+                    total_h += 5.0 * row_h;
+                }
+
+                if self.selector_open("second_selector") {
+                    total_h += 5.0 * row_h;
+                }
                 let y_start = metrics.header_h;
                 
                 if x >= dropdown_x && x <= dropdown_x + dropdown_w
@@ -268,6 +342,24 @@ ui_blueprint! {
                     if interaction.bounds.contains(mouse) {
                         return interaction.action;
                     }
+                }
+            }
+        //    if self.settings_dropdown_open {
+        //        if let Some(RuntimeZone::Dropdown) = self.zone_at(mouse, width, metrics) {
+        //            return EngineHeaderAction::ToggleSettings; // closes the dropdown
+        //        }
+        //    }
+            if self.settings_dropdown_open {
+                match self.zone_at(mouse, width, metrics) {
+                    Some(RuntimeZone::Dropdown) => {
+                        if !self.__open_selectors.is_empty() {
+                            return EngineHeaderAction::CloseSelectors;
+                        }
+                    }
+                    None => {
+                        return EngineHeaderAction::ToggleSettings;
+                    }
+                    _ => {}
                 }
             }
             if mouse.1 <= metrics.header_h { EngineHeaderAction::Drag } else { EngineHeaderAction::None }

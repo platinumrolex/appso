@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct ButtonStyle {
     pub bg_idle: [f32; 4],
     pub bg_hover: [f32; 4],

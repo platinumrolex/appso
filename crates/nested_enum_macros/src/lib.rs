@@ -7,15 +7,20 @@ pub fn ui_blueprint(input: TokenStream) -> TokenStream {
     let tokens: Vec<TokenTree> = input.into_iter().collect();
     let mut idx = 0;
 
-    // 1. Parse Component Name
+    // ---------------------------------------------------------------------
+    // Component name
+    // ---------------------------------------------------------------------
     let component_name = match &tokens.get(idx) {
         Some(TokenTree::Ident(id)) => id.to_string(),
-        _ => panic!("ui_blueprint! requires a component name (e.g., EngineHeader)"),
+        _ => panic!("ui_blueprint! requires component name"),
     };
     idx += 1;
 
-    // Optional: , zones: RuntimeZone
+    // ---------------------------------------------------------------------
+    // Optional zones
+    // ---------------------------------------------------------------------
     let mut zone_enum_name: Option<String> = None;
+
     if let Some(TokenTree::Punct(p)) = tokens.get(idx) {
         if p.as_char() == ',' {
             idx += 1;
@@ -23,108 +28,156 @@ pub fn ui_blueprint(input: TokenStream) -> TokenStream {
                 if id.to_string() == "zones" {
                     idx += 1;
                     if let Some(TokenTree::Punct(p)) = tokens.get(idx) {
-                        assert_eq!(p.as_char(), ':', "Expected ':' after 'zones' in ui_blueprint!");
+                        assert_eq!(p.as_char(), ':');
                         idx += 1;
-                    } else {
-                        panic!("Expected ':' after 'zones' in ui_blueprint!");
                     }
                     if let Some(TokenTree::Ident(id)) = tokens.get(idx) {
                         zone_enum_name = Some(id.to_string());
                         idx += 1;
-                    } else {
-                        panic!("Expected zone enum name after 'zones:' in ui_blueprint!");
                     }
                     if let Some(TokenTree::Punct(p)) = tokens.get(idx) {
-                        assert_eq!(p.as_char(), ',', "Expected ',' after zone enum name in ui_blueprint!");
+                        assert_eq!(p.as_char(), ',');
                         idx += 1;
-                    } else {
-                        panic!("Expected ',' after zone enum name in ui_blueprint!");
                     }
                 }
             }
         }
     }
 
-    // 2. Extract the body (the { ... } after the name / zones clause)
+    // ---------------------------------------------------------------------
+    // Body
+    // ---------------------------------------------------------------------
     let body_group = match &tokens.get(idx) {
         Some(TokenTree::Group(g)) if g.delimiter() == Delimiter::Brace => g.clone(),
-        _ => panic!("Expected {{ ... }} after component name (and optional zones: clause) in ui_blueprint!"),
+        _ => panic!("Expected {{ ... }} body"),
     };
-    idx += 1;
-    if idx != tokens.len() {
-        panic!("Unexpected trailing tokens in ui_blueprint! macro");
-    }
 
     let body_stream = body_group.stream();
 
-    // 3. Scan for actions
+    // ---------------------------------------------------------------------
+    // ACTION SCAN
+    // ---------------------------------------------------------------------
     let mut action_names = HashSet::new();
     scan_for_actions(body_stream.clone(), &mut action_names);
+
     action_names.insert("None".to_string());
     action_names.insert("Drag".to_string());
 
-    // 3b. Scan for zones inside ui! { ... } invocations
-    let mut zones = Vec::new();
-    if zone_enum_name.is_some() {
-        scan_for_zones(body_stream.clone(), &mut zones);
-    }
-
     let action_enum_name = format!("{}Action", component_name);
+
     let mut sorted_actions: Vec<_> = action_names.into_iter().collect();
     sorted_actions.sort();
 
-    // 4. Generate zone enum if requested
+    // ---------------------------------------------------------------------
+    // ZONE ENUM
+    // ---------------------------------------------------------------------
+    // ---------------------------------------------------------------------
+    // SCAN FOR ZONES
+    // ---------------------------------------------------------------------
+    let mut zone_names = Vec::new();
+    scan_for_zones(body_stream.clone(), &mut zone_names);
+    zone_names.sort();
+    zone_names.dedup();
+
+    // ---------------------------------------------------------------------
+    // ZONE ENUM
+    // ---------------------------------------------------------------------
     let zone_enum_code = if let Some(ref name) = zone_enum_name {
-        if zones.is_empty() {
+        if zone_names.is_empty() {
+            // No zones found – emit an empty enum (or omit entirely, but keep for consistency)
             format!(
-                "#[derive(PartialEq, Eq, Debug, Clone, Copy, Default)] pub enum {0} {{ #[default] None }} ",
-                name
+                "#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+                pub enum {name} {{}}"
             )
         } else {
+            let variants = zone_names.join(", ");
             format!(
-                "#[derive(PartialEq, Eq, Debug, Clone, Copy, Default)] pub enum {0} {{ #[default] {1} }} ",
-                name,
-                zones.join(", ")
+                "#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+                pub enum {name} {{ {variants} }}"
             )
         }
     } else {
         String::new()
     };
 
-    // 5. Generate the full code block
+    // ---------------------------------------------------------------------
+    // FINAL OUTPUT
+    // ---------------------------------------------------------------------
     let full_code = format!(
-        "{4}\
-        #[derive(Clone, Copy, PartialEq, Eq, Debug)] \
-        pub enum {0} {{ {1} }} \
-        \
-        impl wgpu_ui::primitives::UiAction for {0} {{ \
-            fn is_interactive(&self) -> bool {{ !matches!(self, {0}::None | {0}::Drag) }} \
-        }} \
-        \
-        impl {2} {{ {3} }}",
-        action_enum_name,
-        sorted_actions.join(", "),
-        component_name,
-        body_stream.to_string(),
-        zone_enum_code
+        r#"
+        {zone_enum_code}
+
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        pub enum {action_enum_name} {{
+            {actions},
+            ToggleSelector(&'static str),
+            CloseSelectors,
+        }}
+
+        impl wgpu_ui::primitives::UiAction for {action_enum_name} {{
+            fn is_interactive(&self) -> bool {{
+                !matches!(self, {action_enum_name}::None | {action_enum_name}::Drag)
+            }}
+        }}
+
+        impl {component_name} {{
+
+            // -------------------------------------------------------------
+            // SELECTOR STATE (framework-owned)
+            // -------------------------------------------------------------
+            pub fn selector_open(&self, id: &'static str) -> bool {{
+                self.__open_selectors.contains(id)
+            }}
+
+            pub fn toggle_selector(&mut self, id: &'static str) {{
+                if self.__open_selectors.contains(id) {{
+                    self.__open_selectors.remove(id);
+                }} else {{
+                    self.__open_selectors.clear();
+                    self.__open_selectors.insert(id);
+                }}
+            }}
+
+            pub fn close_selector(&mut self, id: &'static str) {{
+                self.__open_selectors.remove(id);
+            }}
+
+            // -------------------------------------------------------------
+            // USER LOGIC
+            // -------------------------------------------------------------
+            {body}
+        }}
+        "#,
+        zone_enum_code = zone_enum_code,
+        action_enum_name = action_enum_name,
+        actions = sorted_actions.join(", "),
+        component_name = component_name,
+        body = body_stream.to_string()
     );
 
-    TokenStream::from_str(&full_code).expect("Failed to parse generated UI blueprint code")
+    TokenStream::from_str(&full_code).unwrap()
 }
 
 // ---------------------------------------------------------------------------
-// Action scanner (unchanged logic, adapted to take &mut HashSet)
+// Action scanner
 // ---------------------------------------------------------------------------
 fn scan_for_actions(stream: TokenStream, actions: &mut HashSet<String>) {
     let tokens: Vec<_> = stream.into_iter().collect();
     let mut i = 0;
+
     while i < tokens.len() {
         match &tokens[i] {
+
+            // -----------------------------------------------------------------
+            // EXISTING: action: Something / toggle_action: Something
+            // -----------------------------------------------------------------
             TokenTree::Ident(id) => {
                 let s = id.to_string();
+
                 if s == "action" || s == "toggle_action" {
                     if let Some(TokenTree::Punct(p)) = tokens.get(i + 1) {
                         if p.as_char() == ':' {
+
                             if let Some(TokenTree::Ident(first)) = tokens.get(i + 2) {
                                 let mut name = first.to_string();
                                 let mut offset = 3;
@@ -133,14 +186,14 @@ fn scan_for_actions(stream: TokenStream, actions: &mut HashSet<String>) {
                                     if let (
                                         Some(TokenTree::Punct(p1)),
                                         Some(TokenTree::Punct(p2)),
-                                        Some(TokenTree::Ident(leaf)),
+                                        Some(TokenTree::Ident(next)),
                                     ) = (
                                         tokens.get(i + offset),
                                         tokens.get(i + offset + 1),
                                         tokens.get(i + offset + 2),
                                     ) {
                                         if p1.as_char() == ':' && p2.as_char() == ':' {
-                                            name = leaf.to_string();
+                                            name = next.to_string();
                                             offset += 3;
                                             continue;
                                         }
@@ -157,28 +210,81 @@ fn scan_for_actions(stream: TokenStream, actions: &mut HashSet<String>) {
                     }
                 }
             }
-            TokenTree::Group(g) => scan_for_actions(g.stream(), actions),
+
+            // -----------------------------------------------------------------
+            // NEW: @ToggleSettings OR @Namespace::ToggleSettings
+            // -----------------------------------------------------------------
+            TokenTree::Punct(p) if p.as_char() == '@' => {
+                if let Some(TokenTree::Ident(first)) = tokens.get(i + 1) {
+                    let first_name = first.to_string();
+
+                    // 🚫 SKIP INTERNAL MACRO DIRECTIVES
+                    let internal = ["to", "parse", "render", "apply"];
+                    if internal.contains(&first_name.as_str()) {
+                        i += 1;
+                        continue;
+                    }
+
+                    let mut name = first_name;
+                    let mut offset = 2;
+
+                    // handle @Foo::Bar
+                    loop {
+                        if let (
+                            Some(TokenTree::Punct(p1)),
+                            Some(TokenTree::Punct(p2)),
+                            Some(TokenTree::Ident(next)),
+                        ) = (
+                            tokens.get(i + offset),
+                            tokens.get(i + offset + 1),
+                            tokens.get(i + offset + 2),
+                        ) {
+                            if p1.as_char() == ':' && p2.as_char() == ':' {
+                                name = next.to_string();
+                                offset += 3;
+                                continue;
+                            }
+                        }
+                        break;
+                    }
+
+                    let keywords = ["if", "else", "match", "let", "fn", "for", "in"];
+
+                    if !keywords.contains(&name.as_str()) {
+                        actions.insert(name);
+                    }
+                }
+            }
+
+            // -----------------------------------------------------------------
+            // RECURSE
+            // -----------------------------------------------------------------
+            TokenTree::Group(g) => {
+                scan_for_actions(g.stream(), actions);
+            }
+
             _ => {}
         }
+
         i += 1;
     }
 }
 
 // ---------------------------------------------------------------------------
-// Zone scanner – only looks inside ui! { ... } invocations
+// Zone scanner – looks inside ui! and section! invocations
 // ---------------------------------------------------------------------------
 fn scan_for_zones(stream: TokenStream, zones: &mut Vec<String>) {
     let tokens: Vec<_> = stream.into_iter().collect();
     let mut i = 0;
     while i < tokens.len() {
         match &tokens[i] {
-            TokenTree::Ident(id) if id.to_string() == "ui" => {
+            TokenTree::Ident(id) if id.to_string() == "ui" || id.to_string() == "section" => {
                 if let (Some(TokenTree::Punct(p)), Some(TokenTree::Group(g))) =
                     (tokens.get(i + 1), tokens.get(i + 2))
                 {
                     if p.as_char() == '!' {
-                        scan_ui_macro_for_zones(g.stream(), zones);
-                        i += 3;
+                        scan_stream_for_zones(g.stream(), zones);
+                        i += 2;
                         continue;
                     }
                 }
@@ -192,23 +298,8 @@ fn scan_for_zones(stream: TokenStream, zones: &mut Vec<String>) {
     }
 }
 
-fn scan_ui_macro_for_zones(stream: TokenStream, zones: &mut Vec<String>) {
-    let tokens: Vec<_> = stream.into_iter().collect();
-    for tt in tokens {
-        match &tt {
-            TokenTree::Group(g) if g.delimiter() == Delimiter::Brace => {
-                scan_ui_block_for_zones(g.stream(), zones);
-            }
-            TokenTree::Group(g) => {
-                scan_ui_macro_for_zones(g.stream(), zones);
-            }
-            _ => {}
-        }
-    }
-}
-
-fn scan_ui_block_for_zones(stream: TokenStream, zones: &mut Vec<String>) {
-    let keywords = ["if", "else", "match", "for", "while"]; // Expanded list
+fn scan_stream_for_zones(stream: TokenStream, zones: &mut Vec<String>) {
+    let keywords = ["if", "else", "match", "for", "while", "loop", "let", "mut", "fn", "return", "break", "continue"];
 
     let tokens: Vec<_> = stream.into_iter().collect();
     let mut i = 0;
@@ -220,27 +311,44 @@ fn scan_ui_block_for_zones(stream: TokenStream, zones: &mut Vec<String>) {
             if let Some(TokenTree::Group(g)) = tokens.get(i + 1) {
                 if g.delimiter() == Delimiter::Brace {
                     
+                    let starts_with_upper = name.chars().next().unwrap_or('a').is_uppercase();
+
                     // 1. Skip if it's a field type (e.g. title: CustomTitle { ... })
                     let is_field_type = i > 0 && matches!(
                         tokens.get(i - 1),
                         Some(TokenTree::Punct(p)) if p.as_char() == ':'
                     );
 
-                    // 2. NEW CHECK: Skip if it's preceded by 'if' (e.g. if is_maximized { ... })
+                    // 2. Skip if it's preceded by 'if' (e.g. if is_maximized { ... })
                     let is_conditional = i > 0 && matches!(
                         tokens.get(i - 1),
                         Some(TokenTree::Ident(prev_id)) if prev_id.to_string() == "if"
                     );
 
-                    if !is_field_type && !is_conditional && !keywords.contains(&name.as_str()) && !zones.contains(&name) {
-                        zones.push(name);
+                    // 3. Skip if preceded by '=' (e.g. let rect = Rect { ... })
+                    let is_assignment = i > 0 && matches!(
+                        tokens.get(i - 1),
+                        Some(TokenTree::Punct(p)) if p.as_char() == '='
+                    );
+
+                    if starts_with_upper 
+                        && !is_field_type 
+                        && !is_conditional 
+                        && !is_assignment
+                        && !keywords.contains(&name.as_str()) 
+                        && !zones.contains(&name) 
+                    {
+                        zones.push(name.clone());
                     }
-                    
-                    scan_ui_block_for_zones(g.stream(), zones);
-                    i += 1; 
                 }
             }
         }
+        
+        // Recurse into ANY group
+        if let TokenTree::Group(g) = &tokens[i] {
+            scan_stream_for_zones(g.stream(), zones);
+        }
+        
         i += 1;
     }
 }
